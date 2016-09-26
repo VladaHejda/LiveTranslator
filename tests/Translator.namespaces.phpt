@@ -6,7 +6,7 @@ $container = require __DIR__ . '/bootstrap.application.php';
 require __DIR__.'/storage/namespace.php';
 
 use \LiveTranslator\Translator as Tr;
-$trans = new Tr('en', new NamespaceStorage, $container->getService('session'), $container->getService('application'));
+$trans = new Tr('en', new NamespaceStorage, $container->getService('session'), $container->getService('application'), $container->getService('cache.storage'));
 
 $trans->setCurrentLang('cz')
 	->setNamespace('first');

@@ -5,7 +5,7 @@ $container = require __DIR__ . '/bootstrap.application.php';
 
 require __DIR__.'/storage/dummy.php';
 
-$trans = new \LiveTranslator\Translator('cz', new DummyStorage, $container->getService('session'), $container->getService('application'));
+$trans = new \LiveTranslator\Translator('cz', new DummyStorage, $container->getService('session'), $container->getService('application'), $container->getService('cache.storage'));
 $trans::$defaultPluralForms = 'nplurals=2; plural=(n==1) ? 0 : 1;';
 
 Assert::equal(2, $trans->getVariantsCount());

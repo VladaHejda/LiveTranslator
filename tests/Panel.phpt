@@ -5,7 +5,7 @@ $container = require __DIR__ . '/bootstrap.application.php';
 
 require __DIR__.'/storage/simple.php';
 
-$trans = new \LiveTranslator\Translator('en', new SimpleStorage, $container->getService('session'), $container->getService('application'));
+$trans = new \LiveTranslator\Translator('en', new SimpleStorage, $container->getService('session'), $container->getService('application'), $container->getService('cache.storage'));
 $panel = new \LiveTranslator\Panel($trans, $container->getService('httpRequest'));
 
 Assert::type('LiveTranslator\Translator', $panel->getTranslator());

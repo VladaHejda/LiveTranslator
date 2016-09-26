@@ -46,20 +46,34 @@ class Translator extends Nette\Object implements Nette\Localization\ITranslator
 	/** @var Nette\Application\Application */
 	private $application;
 
+	/** @var \Nette\Caching\Cache */
+	private $cache;
+
 
 	/**
 	 * @param string  $defaultLang
 	 * @param ITranslatorStorage $translatorStorage
 	 * @param Nette\Http\Session $session
 	 * @param Nette\Application\Application $application
+	 * @param \Nette\Caching\IStorage $cacheStorage
 	 */
-	public function __construct($defaultLang, ITranslatorStorage $translatorStorage, Nette\Http\Session $session, Nette\Application\Application $application)
+	public function __construct($defaultLang, ITranslatorStorage $translatorStorage, Nette\Http\Session $session, Nette\Application\Application $application, Nette\Caching\IStorage $cacheStorage)
 	{
 		$this->setDefaultLang($defaultLang);
 		$this->translatorStorage = $translatorStorage;
 		$session->start();
 		$this->session = $session;
 		$this->application = $application;
+
+		$this->cache = new Nette\Caching\Cache($cacheStorage, 'VladaHejda.LiveTranslator');
+	}
+
+
+	public function cacheDisable($disable = TRUE)
+	{
+		if ($disable) {
+			$this->cache = NULL;
+		}
 	}
 
 
@@ -358,8 +372,7 @@ class Translator extends Nette\Object implements Nette\Localization\ITranslator
 			}
 
 			if (!$translated) {
-				$newStrings = &$this->getNewStrings();
-				$newStrings[$string] = FALSE;
+				$this->setNewStringUntranslated($string);
 
 				if ($hasVariants) {
 					if (isset($stringVariants[$plural])) {
@@ -416,9 +429,8 @@ class Translator extends Nette\Object implements Nette\Localization\ITranslator
 		}
 		$original = trim($original);
 		if ($translated === FALSE) {
-			$newStrings = &$this->getNewStrings();
 			$this->translatorStorage->removeTranslation($original, $lang, $this->namespace);
-			$newStrings[$original] = FALSE;
+			$this->setNewStringUntranslated($original);
 			return;
 		}
 
@@ -429,8 +441,7 @@ class Translator extends Nette\Object implements Nette\Localization\ITranslator
 		foreach ($translated as $variant => $string) {
 			$this->translatorStorage->setTranslation($original, $string, $lang, $variant, $this->namespace);
 		}
-		$newStrings = &$this->getNewStrings();
-		unset($newStrings[$original]);
+		$this->setNewStringTranslated($original);
 	}
 
 
@@ -443,14 +454,53 @@ class Translator extends Nette\Object implements Nette\Localization\ITranslator
 
 
 
-	protected function &getNewStrings()
+	protected function saveNewStrings(array $newStrings)
 	{
-		// todo mohlo by to mít jednu section a ns by byly jednotlivý property zde
-		$section = $this->getSessionSection();
-		if (!isset($section->strings)) {
-			$section->strings = array();
+		if (isset($this->cache)) {
+			$ns = $this->namespace ?: 'default';
+			$this->cache->save("newStrings-$ns", $newStrings);
+
+		} else {
+			$section = $this->getSessionSection();
+			$section->strings = $newStrings;
 		}
-		$strings = &$section->strings;
+	}
+
+
+
+	protected function setNewStringTranslated($original)
+	{
+		$newStrings = $this->getNewStrings();
+		unset($newStrings[$original]);
+		$this->saveNewStrings($newStrings);
+	}
+
+
+
+	protected function setNewStringUntranslated($original)
+	{
+		$newStrings = $this->getNewStrings();
+		$newStrings[$original] = FALSE;
+		$this->saveNewStrings($newStrings);
+	}
+
+
+
+	protected function getNewStrings()
+	{
+		if (isset($this->cache)) {
+			$ns = $this->namespace ?: 'default';
+			$strings = (array) $this->cache->load("newStrings-$ns");
+
+		} else {
+			// todo mohlo by to mít jednu section a ns by byly jednotlivý property zde
+			$section = $this->getSessionSection();
+			if (!isset($section->strings)) {
+				$section->strings = array();
+			}
+			$strings = $section->strings;
+		}
+
 		return $strings;
 	}
 

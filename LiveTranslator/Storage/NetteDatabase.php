@@ -15,6 +15,8 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 	/** @var string */
 	private $translationTable;
 
+	/** @var \Nette\Caching\Cache */
+	private $cache;
 
 
 	/**
@@ -22,8 +24,9 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 	 * @param string $translationTableName name of table with translated texts
 	 * @param \Nette\Database\Connection $db
 	 * @param \Nette\Database\Context|NULL $context
+	 * @param \Nette\Caching\IStorage $cacheStorage
 	 */
-	public function __construct($defaultTableName, $translationTableName, \Nette\Database\Connection $db, \Nette\Database\Context $context = NULL)
+	public function __construct($defaultTableName, $translationTableName, \Nette\Database\Connection $db, \Nette\Database\Context $context = NULL, \Nette\Caching\IStorage $cacheStorage)
 	{
 		$this->db = $context ?: $db; // Context is part of newer Nette version
 		if ($defaultTableName[0] !== '`') {
@@ -34,29 +37,50 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 		}
 		$this->defaultTable = $defaultTableName;
 		$this->translationTable = $translationTableName;
+
+		$this->cache = new \Nette\Caching\Cache($cacheStorage, 'VladaHejda.LiveTranslator');
+	}
+
+
+
+	public function cacheDisable($disable = TRUE)
+	{
+		if ($disable) {
+			$this->cache = NULL;
+		}
 	}
 
 
 
 	public function getTranslation($original, $lang, $variant = 0, $namespace = NULL)
 	{
-		$arg = array();
+		$translation = isset($this->cache) ? $this->cache->load($original.$lang.$variant.$namespace) : NULL;
 
-		$arg[0] = "SELECT t.`translation` FROM {$this->defaultTable} d
-			JOIN {$this->translationTable} t ON d.`id` = t.`text_id`
-			WHERE ";
+		if ($translation === NULL) {
+			$arg = array();
 
-		if ($namespace){
-			$arg[0] .= 'd.`ns` = ? AND ';
-			$arg[] = $namespace;
+			$arg[0] = "SELECT t.`translation` FROM {$this->defaultTable} d
+				JOIN {$this->translationTable} t ON d.`id` = t.`text_id`
+				WHERE ";
+
+			if ($namespace){
+				$arg[0] .= 'd.`ns` = ? AND ';
+				$arg[] = $namespace;
+			}
+
+			$arg[0] .= 'BINARY d.`text` = ? AND t.`lang` = ? AND t.`variant` <= ? ORDER BY t.`variant` DESC';
+			$arg[] = $original;
+			$arg[] = $lang;
+			$arg[] = $variant;
+
+			$translation = $this->fetchField($arg);
+
+			if (isset($this->cache)) {
+				$this->cache->save($original.$lang.$variant.$namespace, $translation, array(
+					\Nette\Caching\Cache::TAGS => array($original.$lang.$namespace)
+				));
+			}
 		}
-
-		$arg[0] .= 'BINARY d.`text` = ? AND t.`lang` = ? AND t.`variant` <= ? ORDER BY t.`variant` DESC';
-		$arg[] = $original;
-		$arg[] = $lang;
-		$arg[] = $variant;
-
-		$translation = $this->fetchField($arg);
 
 		return $translation ?: NULL;
 	}
@@ -95,6 +119,10 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 	public function setTranslation($original, $translated, $lang, $variant = 0, $namespace = NULL)
 	{
+		if (isset($this->cache)) {
+			$this->cache->remove($original.$lang.$variant.$namespace);
+		}
+
 		$arg = array();
 
 		$arg[0] = "SELECT `id` FROM {$this->defaultTable} WHERE ";
@@ -140,6 +168,10 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 	public function removeTranslation($original, $lang, $namespace = NULL)
 	{
+		if (isset($this->cache)) {
+			$this->cache->clean(array(\Nette\Caching\Cache::TAGS => $original.$lang.$namespace));
+		}
+		
 		$arg = array();
 
 		$arg[0] = "SELECT d.`id` FROM {$this->defaultTable} d

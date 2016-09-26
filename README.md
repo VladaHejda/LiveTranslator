@@ -59,7 +59,15 @@ services:
 	translatorStorage: LiveTranslator\Storage\NetteDatabase(localization_text, localization)
 ```
 
-*You can rename tables in SQL script (use the same names in config file).*
+*You can rename tables in SQL script (use the same names in config file).*   
+In default `LiveTranslator\Storage\NetteDatabase` uses `Nette\Caching`. For disabling this function use `cacheDisable()` method:  
+```
+services:
+	translatorStorage: 
+		class: LiveTranslator\Storage\NetteDatabase(localization_text, localization)
+		setup:
+			- cacheDisable()
+```
 
 - **I am using [Dibi](http://dibiphp.com/)**
 
@@ -93,6 +101,16 @@ nette:
 services:
 	translator: LiveTranslator\Translator(en)
 	translatorPanel: LiveTranslator\Panel
+```
+
+In default `LiveTranslator\Translator` uses `Nette\Caching` for storage untranslated strings. For disabling caching use `cacheDisable()` method. Then will be use SEESIONS:  
+```
+services:
+	translator: 
+		class: LiveTranslator\Translator(en)
+		setup:
+			- cacheDisable()
+	...
 ```
 
 
