@@ -330,16 +330,17 @@ Running tests
 Install dependencies including dev requirements and run the [Nette Tester](https://tester.nette.org/) suite:
 ```
 composer install
-vendor/bin/tester -s tests/
+composer test
 ```
 
-(`tests/run-tests.sh` is kept for historical reasons only — it points to a path Nette Tester no longer uses,
-so call `vendor/bin/tester` directly as shown above.)
+(`composer test` runs `vendor/bin/tester -s -C tests` - with the system php.ini, the tests need the tokenizer
+extension. `tests/run-tests.sh` is kept for historical reasons only — it points to a path Nette Tester no longer uses,
+so use `composer test` or call `vendor/bin/tester` directly.)
 
 The test of `Storage\UntranslatedNetteDatabase` runs only against a MySQL/MariaDB database given by environment
 variables (it uses a temporary table), otherwise it is skipped:
 ```
-LIVETRANSLATOR_TEST_DSN="mysql:host=127.0.0.1;dbname=test" LIVETRANSLATOR_TEST_USER=root LIVETRANSLATOR_TEST_PASSWORD=... vendor/bin/tester -s tests/
+LIVETRANSLATOR_TEST_DSN="mysql:host=127.0.0.1;dbname=test" LIVETRANSLATOR_TEST_USER=root LIVETRANSLATOR_TEST_PASSWORD=... composer test
 ```
 
 

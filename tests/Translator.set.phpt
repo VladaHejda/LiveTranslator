@@ -5,7 +5,7 @@ $container = require __DIR__ . '/bootstrap.application.php';
 
 require __DIR__.'/storage/simple.php';
 
-$trans = new \LiveTranslator\Translator('en', new SimpleStorage, $container->getService('session'), $container->getService('application'));
+$trans = new \LiveTranslator\Translator('en', new SimpleStorage, $container->getService('application'));
 
 $trans->setCurrentLang('cz')
 	->setAvailableLanguages(array(

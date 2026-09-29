@@ -26,5 +26,11 @@
 	},
     "require-dev": {
         "nette/tester": "@dev"
+    },
+    "scripts": {
+        "test": "tester -s -C tests"
+    },
+    "scripts-descriptions": {
+        "test": "Runs Nette Tester tests (with the system php.ini - the tokenizer extension is needed)"
     }
 }
