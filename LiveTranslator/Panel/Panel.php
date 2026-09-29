@@ -156,8 +156,8 @@ class Panel implements \Tracy\IBarPanel
 	private function createTemplate(): Latte\Engine
 	{
 		$latte = new Latte\Engine;
-		$latte->addFilter('ordinal', function($n){
-			switch (substr($n, -1)) {
+		$latte->addFilter('ordinal', function (int|string $n): string {
+			switch (substr((string) $n, -1)) { // plural variant number - int under strict_types
 				case 1:
 					return 'st';
 				case 2:

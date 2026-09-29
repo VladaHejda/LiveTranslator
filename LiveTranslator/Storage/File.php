@@ -32,6 +32,16 @@ class File implements \LiveTranslator\ITranslatorStorage
 	}
 
 
+	/**
+	 * Directory with translation files - Translator keeps strings without translation next to them by default
+	 * (UntranslatedFile).
+	 */
+	public function getStorageDir(): string
+	{
+		return $this->storageDir;
+	}
+
+
 	public function getTranslation(string $original, string $lang, int $variant = 0, ?string $namespace = null): ?string
 	{
 		$changed = $this->tryGetChanged($original, $lang, $variant, $namespace);
@@ -47,6 +57,7 @@ class File implements \LiveTranslator\ITranslatorStorage
 				break;
 			}
 			while ($translation = fgets($handler)) {
+				$translation = $this->terminateLine($translation);
 				if (!empty($prepend)) {
 					$translation = $prepend . $translation;
 					$prepend = null;
@@ -84,6 +95,7 @@ class File implements \LiveTranslator\ITranslatorStorage
 		$translations = array();
 
 		while ($translation = fgets($handler)) {
+			$translation = $this->terminateLine($translation);
 			if (!empty($prepend)) {
 				$translation = $prepend . $translation;
 				$prepend = null;
@@ -124,7 +136,8 @@ class File implements \LiveTranslator\ITranslatorStorage
 			foreach ($this->metaData as $meta => $originals) {
 				list($lang, $namespace) = unserialize($meta);
 				$filePath = $this->storageDir . DIRECTORY_SEPARATOR . $this->getFilename($lang, $namespace);
-				$data = file_exists($filePath) ? file($filePath) : array();
+				$lines = file_exists($filePath) ? file($filePath) : false;
+				$data = $lines === false ? array() : array_map(fn(string $row): string => $this->terminateLine($row), $lines);
 
 				foreach ($data as $i => &$row) {
 					if (!empty($prepend)) {
@@ -194,6 +207,16 @@ class File implements \LiveTranslator\ITranslatorStorage
 		}
 
 		return $this->handlers[$file] = $handler;
+	}
+
+
+	/**
+	 * The last line of a hand-edited file may lack the newline - without it the last translation was never read
+	 * and a translation saved from the panel was glued to it on the same line.
+	 */
+	private function terminateLine(string $line): string
+	{
+		return substr($line, -1) === "\n" ? $line : $line . "\n";
 	}
 
 

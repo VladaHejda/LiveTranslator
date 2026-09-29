@@ -8,6 +8,10 @@ use Nette;
 /**
  * Translator implementation.
  *
+ * Does not use the session itself. Strings without translation (offered by the translation panel) are kept
+ * by IUntranslatedStorage: given in the constructor (Storage\UntranslatedSession, Storage\UntranslatedNetteDatabase), by default Storage\UntranslatedFile
+ * next to the translations of Storage\File (`<lang>.<namespace>.untranslated`), otherwise for the current request only.
+ *
  * @author Vladislav Hejda
  *
  * @property ?string $namespace
@@ -37,18 +41,26 @@ class Translator implements Nette\Localization\Translator
 
 	private ITranslatorStorage $translatorStorage;
 
-	private Nette\Http\Session $session;
-
 	private Nette\Application\Application $application;
 
+	private ?IUntranslatedStorage $untranslatedStorage;
 
-	public function __construct(string $defaultLang, ITranslatorStorage $translatorStorage, Nette\Http\Session $session, Nette\Application\Application $application)
-	{
+	/** @var array<string, array<string, false>> strings without translation by "lang|namespace": original => false (same shape as in getAllStrings()) */
+	private array $untranslated = array();
+
+
+	public function __construct(
+		string $defaultLang,
+		ITranslatorStorage $translatorStorage,
+		Nette\Application\Application $application,
+		?IUntranslatedStorage $untranslatedStorage = null,
+	) {
 		$this->setDefaultLang($defaultLang);
 		$this->translatorStorage = $translatorStorage;
-		$session->start();
-		$this->session = $session;
 		$this->application = $application;
+		$this->untranslatedStorage = $untranslatedStorage ?? ($translatorStorage instanceof Storage\File
+			? new Storage\UntranslatedFile($translatorStorage->getStorageDir())
+			: null);
 	}
 
 
@@ -300,8 +312,7 @@ class Translator implements Nette\Localization\Translator
 			}
 
 			if (!$translated) {
-				$newStrings = &$this->getNewStrings();
-				$newStrings[$message] = false;
+				$this->addUntranslated($message);
 
 				if ($hasVariants) {
 					if (isset($stringVariants[$plural])) {
@@ -342,8 +353,7 @@ class Translator implements Nette\Localization\Translator
 			throw new TranslatorException('ITranslatorStorage::getAllTranslations() must return array, '.gettype($strings).' returned.');
 		}
 
-		$newStrings = $this->getNewStrings();
-		return $strings + (is_array($newStrings) ? $newStrings : array());
+		return $strings + $this->getUntranslated();
 	}
 
 
@@ -359,9 +369,8 @@ class Translator implements Nette\Localization\Translator
 		}
 		$original = trim($original);
 		if ($translated === false) {
-			$newStrings = &$this->getNewStrings();
 			$this->translatorStorage->removeTranslation($original, $lang, $this->namespace);
-			unset($newStrings[$original]);
+			$this->removeUntranslated($original);
 			return;
 		}
 
@@ -372,27 +381,56 @@ class Translator implements Nette\Localization\Translator
 		foreach ($translated as $variant => $string) {
 			$this->translatorStorage->setTranslation($original, $string, $lang, $variant, $this->namespace);
 		}
+		$this->removeUntranslated($original);
 	}
 
 
 
-	protected function getSessionSection(): Nette\Http\SessionSection
+	/**
+	 * Strings without translation for the current language and namespace - loaded from IUntranslatedStorage once
+	 * per request, without it collected in this request only.
+	 *
+	 * @return array<string, false>
+	 */
+	protected function &getUntranslated(): array
 	{
-		$ns = $this->namespace ?: 'default';
-		return $this->session->getSection("LT-$ns");
-	}
-
-
-
-	protected function &getNewStrings(): array
-	{
-		// todo mohlo by to mít jednu section a ns by byly jednotlivý property zde
-		$section = $this->getSessionSection();
-		if (!isset($section->strings)) {
-			$section->strings = array();
+		$lang = $this->getCurrentLang();
+		$key = $lang . '|' . $this->namespace;
+		if (!isset($this->untranslated[$key])) {
+			$originals = $this->untranslatedStorage?->getUntranslated($lang, $this->namespace) ?? array();
+			$this->untranslated[$key] = array_fill_keys($originals, false);
 		}
-		$strings = &$section->strings;
-		return $strings;
+
+		return $this->untranslated[$key];
+	}
+
+
+
+	/**
+	 * The storage is written only for a string not recorded yet - not on every request that renders it.
+	 */
+	private function addUntranslated(string $original): void
+	{
+		$untranslated = &$this->getUntranslated();
+		if (array_key_exists($original, $untranslated)) {
+			return;
+		}
+
+		$untranslated[$original] = false;
+		$this->untranslatedStorage?->addUntranslated($original, $this->getCurrentLang(), $this->namespace);
+	}
+
+
+
+	private function removeUntranslated(string $original): void
+	{
+		$untranslated = &$this->getUntranslated();
+		if (!array_key_exists($original, $untranslated)) {
+			return;
+		}
+
+		unset($untranslated[$original]);
+		$this->untranslatedStorage?->removeUntranslated($original, $this->getCurrentLang(), $this->namespace);
 	}
 
 
@@ -405,6 +443,15 @@ class Translator implements Nette\Localization\Translator
 			throw new TranslatorException("Empty plural-form meta for language $lang.");
 		}
 
+		// the meta is evaluated as PHP code - let only the plural-form syntax through (a label used as the value,
+		// e.g. setAvailableLanguages(['cs' => 'cs']), used to end with a ParseError from eval())
+		$pluralForms = rtrim(trim($pluralForms), ';') . ';';
+		if (!preg_match('/^nplurals\s*=\s*\d+\s*;\s*plural\s*=[\sn\d!=<>&|?:%()+\-*\/]+;$/', $pluralForms)) {
+			throw new TranslatorException(
+				"Invalid plural-form meta '$pluralForms' for language $lang, expected e.g. 'nplurals=2; plural=(n != 1);'."
+			  . ' Values of setAvailableLanguages() are plural-form rules, not labels.');
+		}
+
 		$eval = preg_replace('/([a-z]+)/', '$$1', "n=$count;$pluralForms");
 		eval($eval);
 
@@ -414,6 +461,9 @@ class Translator implements Nette\Localization\Translator
 		if (!isset($plural)) {
 			throw new TranslatorException("Cannot resolve plural form for $lang. Check plural-form meta $pluralForms.");
 		}
+		// a comparison rule (gettext "plural=(n != 1);") evaluates to bool
+		$nplurals = (int) $nplurals;
+		$plural = (int) $plural;
 		if (($plural +1) > $nplurals) {
 			throw new TranslatorException(
 				"Plural-form parse error for $lang. Plural form cannot exceed ".($nplurals-1)
