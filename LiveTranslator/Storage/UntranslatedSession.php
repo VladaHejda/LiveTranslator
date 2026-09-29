@@ -31,25 +31,33 @@ class UntranslatedSession implements IUntranslatedStorage
 
 
 	/**
-	 * @return string[]
+	 * @return array<string, bool>
 	 */
 	public function getUntranslated(string $lang, ?string $namespace = null): array
 	{
 		// reading does not start the session (SessionSection::get() without an existing session returns null)
-		$originals = $this->getSection()->get($this->getKey($lang, $namespace));
+		$data = $this->getSection()->get($this->getKey($lang, $namespace));
+		if (!is_array($data)) {
+			return array();
+		}
 
-		return is_array($originals) ? array_values(array_filter($originals, 'is_string')) : array();
+		$originals = array();
+		foreach ($data as $original => $plural) {
+			$originals[(string) $original] = (bool) $plural;
+		}
+
+		return $originals;
 	}
 
 
-	public function addUntranslated(string $original, string $lang, ?string $namespace = null): void
+	public function addUntranslated(string $original, string $lang, ?string $namespace = null, bool $plural = false): void
 	{
 		$originals = $this->getUntranslated($lang, $namespace);
-		if (in_array($original, $originals, true)) {
+		if (array_key_exists($original, $originals) && ($originals[$original] || !$plural)) {
 			return;
 		}
 
-		$originals[] = $original;
+		$originals[$original] = $plural;
 		$this->getSection()->set($this->getKey($lang, $namespace), $originals);
 	}
 
@@ -57,13 +65,11 @@ class UntranslatedSession implements IUntranslatedStorage
 	public function removeUntranslated(string $original, string $lang, ?string $namespace = null): void
 	{
 		$originals = $this->getUntranslated($lang, $namespace);
-		if (!in_array($original, $originals, true)) {
+		if (!array_key_exists($original, $originals)) {
 			return;
 		}
 
-		$originals = array_values(array_filter($originals, function (string $item) use ($original): bool {
-			return $item !== $original;
-		}));
+		unset($originals[$original]);
 
 		$originals
 			? $this->getSection()->set($this->getKey($lang, $namespace), $originals)

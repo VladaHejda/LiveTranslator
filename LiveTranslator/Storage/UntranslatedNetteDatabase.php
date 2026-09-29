@@ -12,7 +12,7 @@ use LiveTranslator\IUntranslatedStorage;
  *     services:
  *         - LiveTranslator\Storage\UntranslatedNetteDatabase(localization_untranslated)
  *
- * Uniqueness is guarded by the table (lang + ns + SHA-1 of the text, INSERT IGNORE), so concurrent requests do not
+ * Uniqueness is guarded by the table (lang + ns + SHA-1 of the text, ON DUPLICATE KEY UPDATE), so concurrent requests do not
  * create duplicates. No namespace is stored as an empty string (a unique index allows repeated NULLs).
  */
 class UntranslatedNetteDatabase implements IUntranslatedStorage
@@ -34,12 +34,12 @@ class UntranslatedNetteDatabase implements IUntranslatedStorage
 
 
 	/**
-	 * @return string[]
+	 * @return array<string, bool>
 	 */
 	public function getUntranslated(string $lang, ?string $namespace = null): array
 	{
 		$rows = $this->db->fetchAll(
-			'SELECT `text` FROM ?name WHERE `lang` = ? AND `ns` = ? ORDER BY `id`',
+			'SELECT `text`, `plural` FROM ?name WHERE `lang` = ? AND `ns` = ? ORDER BY `id`',
 			$this->table,
 			$lang,
 			(string) $namespace,
@@ -48,7 +48,7 @@ class UntranslatedNetteDatabase implements IUntranslatedStorage
 		$originals = array();
 		foreach ($rows as $row) {
 			if (is_string($row->text)) {
-				$originals[] = $row->text;
+				$originals[$row->text] = (bool) $row->plural;
 			}
 		}
 
@@ -56,15 +56,19 @@ class UntranslatedNetteDatabase implements IUntranslatedStorage
 	}
 
 
-	public function addUntranslated(string $original, string $lang, ?string $namespace = null): void
+	public function addUntranslated(string $original, string $lang, ?string $namespace = null, bool $plural = false): void
 	{
+		// an existing row is only marked as plural, never unmarked
 		$this->db->query(
-			'INSERT IGNORE INTO ?name (`lang`, `ns`, `hash`, `text`) VALUES (?, ?, ?, ?)',
+			'INSERT INTO ?name (`lang`, `ns`, `hash`, `text`, `plural`) VALUES (?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE `plural` = GREATEST(`plural`, ?)',
 			$this->table,
 			$lang,
 			(string) $namespace,
 			sha1($original),
 			$original,
+			(int) $plural,
+			(int) $plural,
 		);
 	}
 

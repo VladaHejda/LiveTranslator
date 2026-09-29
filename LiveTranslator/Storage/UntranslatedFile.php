@@ -6,12 +6,13 @@ namespace LiveTranslator\Storage;
 use LiveTranslator\IUntranslatedStorage;
 
 /**
- * Strings without translation in files `<lang>.<namespace>.untranslated` (JSON list), usually in the same directory
- * as the translations of Storage\File (e.g. `cs.admin` -> `cs.admin.untranslated`). The default for the translator
+ * Strings without translation in files `<lang>.<namespace>.untranslated`, usually in the same directory as
+ * the translations of Storage\File (e.g. `cs.admin` -> `cs.admin.untranslated`). The default for the translator
  * with Storage\File.
  *
- * A file is written only when the list changes (read-modify-write under an exclusive lock - concurrent requests)
- * and removed when the list gets empty.
+ * JSON object original => used as plural (`{"Save": false, "%d day": true}`); a JSON list of originals (the format
+ * of 3.0 pre-release) is still read. A file is written only when the list changes (read-modify-write under
+ * an exclusive lock - concurrent requests) and removed when the list gets empty.
  */
 class UntranslatedFile implements IUntranslatedStorage
 {
@@ -35,7 +36,7 @@ class UntranslatedFile implements IUntranslatedStorage
 
 
 	/**
-	 * @return string[]
+	 * @return array<string, bool>
 	 */
 	public function getUntranslated(string $lang, ?string $namespace = null): array
 	{
@@ -57,12 +58,10 @@ class UntranslatedFile implements IUntranslatedStorage
 	}
 
 
-	public function addUntranslated(string $original, string $lang, ?string $namespace = null): void
+	public function addUntranslated(string $original, string $lang, ?string $namespace = null, bool $plural = false): void
 	{
-		$this->modify($lang, $namespace, function (array $originals) use ($original): array {
-			if (!in_array($original, $originals, true)) {
-				$originals[] = $original;
-			}
+		$this->modify($lang, $namespace, function (array $originals) use ($original, $plural): array {
+			$originals[$original] = $plural || ($originals[$original] ?? false);
 			return $originals;
 		});
 	}
@@ -75,9 +74,8 @@ class UntranslatedFile implements IUntranslatedStorage
 		}
 
 		$this->modify($lang, $namespace, function (array $originals) use ($original): array {
-			return array_values(array_filter($originals, function (string $item) use ($original): bool {
-				return $item !== $original;
-			}));
+			unset($originals[$original]);
+			return $originals;
 		});
 	}
 
@@ -89,7 +87,7 @@ class UntranslatedFile implements IUntranslatedStorage
 
 
 	/**
-	 * @param callable(string[]): string[] $modify
+	 * @param callable(array<string, bool>): array<string, bool> $modify
 	 */
 	private function modify(string $lang, ?string $namespace, callable $modify): void
 	{
@@ -108,7 +106,8 @@ class UntranslatedFile implements IUntranslatedStorage
 			ftruncate($handler, 0);
 			rewind($handler);
 			if ($modified) {
-				fwrite($handler, json_encode($modified, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
+				// FORCE_OBJECT: originals "0", "1", ... would otherwise be written as a JSON list
+				fwrite($handler, json_encode($modified, JSON_FORCE_OBJECT | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
 			}
 			fflush($handler);
 		}
@@ -123,12 +122,24 @@ class UntranslatedFile implements IUntranslatedStorage
 
 
 	/**
-	 * @return string[]
+	 * @return array<string, bool>
 	 */
 	private function decode(string $content): array
 	{
-		$originals = $content === '' ? null : json_decode($content, true);
+		$data = $content === '' ? null : json_decode($content, true);
+		if (!is_array($data)) {
+			return array();
+		}
 
-		return is_array($originals) ? array_values(array_filter($originals, 'is_string')) : array();
+		$originals = array();
+		foreach ($data as $key => $value) {
+			if (is_string($value)) {
+				$originals[$value] = false; // list of originals (3.0 pre-release)
+			} elseif (is_bool($value)) {
+				$originals[(string) $key] = $value;
+			}
+		}
+
+		return $originals;
 	}
 }

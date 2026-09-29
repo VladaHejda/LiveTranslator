@@ -14,15 +14,16 @@ interface IUntranslatedStorage
 	/**
 	 * Original strings without translation recorded for given language, in order of discovery.
 	 *
-	 * @return string[]
+	 * @return array<string, bool> original => used as plural (the panel offers all plural forms of the language)
 	 */
 	function getUntranslated(string $lang, ?string $namespace = null): array;
 
 
 	/**
-	 * Records a string without translation (already recorded string is ignored).
+	 * Records a string without translation. An already recorded string is only marked as plural when $plural is true
+	 * (a plural mark is never removed).
 	 */
-	function addUntranslated(string $original, string $lang, ?string $namespace = null): void;
+	function addUntranslated(string $original, string $lang, ?string $namespace = null, bool $plural = false): void;
 
 
 	/**

@@ -270,6 +270,8 @@ function clone(obj){
 var translationPanel = {
 	strings: {json_encode($translator->getAllStrings())|noescape},
 	variants: {$translator->getVariantsCount()},
+	// texts used as plural - only they get all plural forms of the language, the others one field
+	plurals: {json_encode($translator->getPluralStrings(), \JSON_FORCE_OBJECT)|noescape},
 
 	updatedStrings: [],
 	erasedStrings: [],
@@ -331,6 +333,10 @@ var translationPanel = {
 		translationPanel.setStatus();
 	},
 
+	variantsOf: function (string) {
+		return this.plurals[string] ? this.variants : 1;
+	},
+
 	drawList: function () {
 		var list = document.getElementById('TranslationPanel-strings');
 		list.innerHTML = '';
@@ -341,9 +347,11 @@ var translationPanel = {
 
 		for (var i in this.strings) {
 			var translated = Boolean(this.strings[i]);
-			if (translated && (typeof(this.strings[i]) == 'object' && this.strings[i] instanceof Array) && this.strings[i].length > 1) {
+			if (translated && this.plurals[i]) {
+				// a plural text is translated only when all plural forms are filled
+				var forms = (typeof(this.strings[i]) == 'object' && this.strings[i] instanceof Array) ? this.strings[i] : [this.strings[i]];
 				for (var plural = 0; plural < this.variants; plural++) {
-					if (!this.strings[i][plural]) {
+					if (!forms[plural]) {
 						translated = false;
 						break;
 					}
@@ -443,8 +451,8 @@ var translationPanel = {
 	edit: function (anchor) {
 		var string = anchor.title;
 
-		this.fillIn(this.strings[string]);
 		this.currentString = string;
+		this.fillIn(this.strings[string]);
 		document.getElementById('TranslationPanel-stringVariant_0').focus();
 
 		var textarea = document.createElement('textarea');
@@ -504,16 +512,24 @@ var translationPanel = {
 		if (typeof(stringData) != 'object' || !(stringData instanceof Array))
 			stringData = [stringData];
 
+		var variants = this.variantsOf(this.currentString);
 		for (var i = 0; i < this.variants; i++) {
 			var textarea = document.getElementById('TranslationPanel-stringVariant_' + i);
 			textarea.disabled = false;
 			textarea.className = '';
+			textarea.parentNode.style.display = i < variants ? '' : 'none';
 
-			if (stringData[i])
+			if (i < variants && stringData[i])
 				textarea.value = stringData[i];
 			else
 				textarea.value = '';
 		}
+		this.setSingularLabel(variants > 1);
+	},
+
+	// the first field is "Singular" for a plural text, just "Translation" for the others
+	setSingularLabel: function (plural) {
+		document.getElementById('TranslationPanel-stringVariantLabel_0').textContent = plural ? 'Singular:' : 'Translation:';
 	},
 
 	disable: function () {
@@ -523,14 +539,16 @@ var translationPanel = {
 			textarea.value = '';
 			textarea.disabled = true;
 			textarea.className = 'disabled';
+			textarea.parentNode.style.display = i === 0 ? '' : 'none';
 		}
+		this.setSingularLabel(false);
 		this.setOriginalText(null);
 	},
 
 	save: function () {
 		if (this.currentString) {
 			var stringData = [];
-			for (var i = 0; i < this.variants; i++) {
+			for (var i = 0; i < this.variantsOf(this.currentString); i++) {
 				var textarea = document.getElementById('TranslationPanel-stringVariant_' + i);
 				if (textarea.value)
 					stringData[i] = textarea.value;
@@ -648,7 +666,7 @@ translationPanel.init();
 				<div id="TranslationPanel-originalText"></div>
 				{var $variants = range(0, $translator->getVariantsCount() -1)}
 				<div class="TranslationPanel-stringVariant" n:foreach="$variants as $i => $variant">
-					<label for="TranslationPanel-stringVariant_{$i}">{if $i > 0}{$i}<sup>{$i|ordinal}</sup> plural{else}Singular{/if}:</label>
+					<label for="TranslationPanel-stringVariant_{$i}"{if $i === 0} id="TranslationPanel-stringVariantLabel_0"{/if}>{if $i > 0}{$i}<sup>{$i|ordinal}</sup> plural{else}Translation{/if}:</label>
 					<textarea id="TranslationPanel-stringVariant_{$i}" rows="4" cols="40"></textarea>
 				</div>
 				<div id="TranslationPanel-tools">

@@ -12,6 +12,10 @@ use Nette;
  * by IUntranslatedStorage: given in the constructor (Storage\UntranslatedSession, Storage\UntranslatedNetteDatabase), by default Storage\UntranslatedFile
  * next to the translations of Storage\File (`<lang>.<namespace>.untranslated`), otherwise for the current request only.
  *
+ * Plural: a text given as an array of forms (`translate(['%d day', '%d days'], $n)`) is plural - the panel offers all
+ * plural forms of the language only for such texts, one field for the others. Plural rules of common languages are
+ * built in (PluralRules), setAvailableLanguages() needs just language codes; an explicit rule overrides them.
+ *
  * @author Vladislav Hejda
  *
  * @property ?string $namespace
@@ -25,7 +29,7 @@ class Translator implements Nette\Localization\Translator
 {
 	use Nette\SmartObject;
 
-	/** plural-form meta */
+	/** plural-form meta for a language without an explicit rule and unknown to PluralRules */
 	public static string $defaultPluralForms = 'nplurals=1; plural=0;';
 
 	/* @var string */
@@ -35,6 +39,7 @@ class Translator implements Nette\Localization\Translator
 
 	private ?string $lang = null;
 
+	/** @var array<string, ?string> language => explicit plural-form meta, NULL = built-in rule (PluralRules) */
 	private array $availableLanguages = array();
 
 	private ?string $presenterLanguageParam = null;
@@ -45,8 +50,11 @@ class Translator implements Nette\Localization\Translator
 
 	private ?IUntranslatedStorage $untranslatedStorage;
 
-	/** @var array<string, array<string, false>> strings without translation by "lang|namespace": original => false (same shape as in getAllStrings()) */
+	/** @var array<string, array<string, bool>> strings without translation by "lang|namespace": original => used as plural */
 	private array $untranslated = array();
+
+	/** @var array<string, array<string, true>> texts used as plural in this request by namespace (plurality does not depend on the language) */
+	private array $plurals = array();
 
 
 	public function __construct(
@@ -104,6 +112,9 @@ class Translator implements Nette\Localization\Translator
 	}
 
 
+	/**
+	 * Number of plural forms of the language (fields the panel offers for a plural text)
+	 */
 	public function getVariantsCount(?string $lang = null): int
 	{
 		list($nplurals) = $this->evalPluralForms(1, $lang);
@@ -160,7 +171,7 @@ class Translator implements Nette\Localization\Translator
 		if ($this->lang === $lang) {
 			return $this;
 		}
-		if ($this->availableLanguages && !isset($this->availableLanguages[$lang])) {
+		if ($this->availableLanguages && !array_key_exists($lang, $this->availableLanguages)) {
 			throw new TranslatorException("Language $lang is not available.");
 		}
 
@@ -182,7 +193,7 @@ class Translator implements Nette\Localization\Translator
 		if ($this->defaultLang === $lang) {
 			return $this;
 		}
-		if ($this->availableLanguages && !isset($this->availableLanguages[$lang])) {
+		if ($this->availableLanguages && !array_key_exists($lang, $this->availableLanguages)) {
 			throw new TranslatorException("Language $lang is not available.");
 		}
 
@@ -205,16 +216,17 @@ class Translator implements Nette\Localization\Translator
 
 		foreach ($languages as $lang => $pluralForms) {
 			if (!is_string($lang)) {
+				// just the code - plural rule built in (PluralRules), otherwise $defaultPluralForms
 				$lang = $pluralForms;
-				$pluralForms = self::$defaultPluralForms;
+				$pluralForms = null;
 			}
 			$this->availableLanguages[$lang] = $pluralForms;
 		}
 
-		if ($this->lang && !isset($this->availableLanguages[$this->lang])) {
+		if ($this->lang && !array_key_exists($this->lang, $this->availableLanguages)) {
 			throw new TranslatorException("Set language $this->lang is not available.");
 		}
-		if (!isset($this->availableLanguages[$this->defaultLang])) {
+		if (!array_key_exists((string) $this->defaultLang, $this->availableLanguages)) {
 			throw new TranslatorException("Default language $this->defaultLang is not available.");
 		}
 
@@ -243,6 +255,7 @@ class Translator implements Nette\Localization\Translator
 			$hasVariants = true;
 			$stringVariants = array_map('trim', array_values($message));
 			$message = trim((string) $message[0]);
+			$this->plurals[(string) $this->namespace][$message] = true;
 		} else {
 			$message = trim((string) $message);
 			$plural = 0;
@@ -312,7 +325,7 @@ class Translator implements Nette\Localization\Translator
 			}
 
 			if (!$translated) {
-				$this->addUntranslated($message);
+				$this->addUntranslated($message, $hasVariants);
 
 				if ($hasVariants) {
 					if (isset($stringVariants[$plural])) {
@@ -353,7 +366,33 @@ class Translator implements Nette\Localization\Translator
 			throw new TranslatorException('ITranslatorStorage::getAllTranslations() must return array, '.gettype($strings).' returned.');
 		}
 
-		return $strings + $this->getUntranslated();
+		return $strings + array_fill_keys(array_keys($this->getUntranslated()), false);
+	}
+
+
+
+	/**
+	 * Plural texts of the current language and namespace: used as plural (an array of forms) in this request,
+	 * recorded as plural among strings without translation, or translated in more than one form. The panel offers
+	 * all plural forms of the language (getVariantsCount()) only for them, one field for the other texts.
+	 *
+	 * @return array<string, true>
+	 */
+	public function getPluralStrings(): array
+	{
+		$plurals = $this->plurals[(string) $this->namespace] ?? array();
+		foreach ($this->getUntranslated() as $original => $plural) {
+			if ($plural) {
+				$plurals[$original] = true;
+			}
+		}
+		foreach ($this->translatorStorage->getAllTranslations($this->getCurrentLang(), $this->namespace) as $original => $variants) {
+			if (is_array($variants) && count($variants) > 1) {
+				$plurals[$original] = true;
+			}
+		}
+
+		return $plurals;
 	}
 
 
@@ -378,27 +417,37 @@ class Translator implements Nette\Localization\Translator
 			$translated = array($translated);
 		}
 		$translated = array_values($translated);
+		$filled = 0;
 		foreach ($translated as $variant => $string) {
+			// the panel sends null for an empty form between filled ones - the variant index must stay
+			if (!is_string($string) || $string === '') {
+				continue;
+			}
 			$this->translatorStorage->setTranslation($original, $string, $lang, $variant, $this->namespace);
+			$filled++;
 		}
-		$this->removeUntranslated($original);
+
+		// a plural text stays among untranslated (with its plural mark) until all plural forms are filled
+		$untranslated = $this->getUntranslated();
+		if (empty($untranslated[$original]) || $filled >= $this->getVariantsCount()) {
+			$this->removeUntranslated($original);
+		}
 	}
 
 
 
 	/**
-	 * Strings without translation for the current language and namespace - loaded from IUntranslatedStorage once
-	 * per request, without it collected in this request only.
+	 * Strings without translation for the current language and namespace (original => used as plural) - loaded from
+	 * IUntranslatedStorage once per request, without it collected in this request only.
 	 *
-	 * @return array<string, false>
+	 * @return array<string, bool>
 	 */
 	protected function &getUntranslated(): array
 	{
 		$lang = $this->getCurrentLang();
 		$key = $lang . '|' . $this->namespace;
 		if (!isset($this->untranslated[$key])) {
-			$originals = $this->untranslatedStorage?->getUntranslated($lang, $this->namespace) ?? array();
-			$this->untranslated[$key] = array_fill_keys($originals, false);
+			$this->untranslated[$key] = $this->untranslatedStorage?->getUntranslated($lang, $this->namespace) ?? array();
 		}
 
 		return $this->untranslated[$key];
@@ -407,17 +456,18 @@ class Translator implements Nette\Localization\Translator
 
 
 	/**
-	 * The storage is written only for a string not recorded yet - not on every request that renders it.
+	 * The storage is written only for a string not recorded yet (or recorded, but newly used as plural) - not on every
+	 * request that renders it.
 	 */
-	private function addUntranslated(string $original): void
+	private function addUntranslated(string $original, bool $plural): void
 	{
 		$untranslated = &$this->getUntranslated();
-		if (array_key_exists($original, $untranslated)) {
+		if (array_key_exists($original, $untranslated) && ($untranslated[$original] || !$plural)) {
 			return;
 		}
 
-		$untranslated[$original] = false;
-		$this->untranslatedStorage?->addUntranslated($original, $this->getCurrentLang(), $this->namespace);
+		$untranslated[$original] = $plural;
+		$this->untranslatedStorage?->addUntranslated($original, $this->getCurrentLang(), $this->namespace, $plural);
 	}
 
 
@@ -438,7 +488,16 @@ class Translator implements Nette\Localization\Translator
 	private function evalPluralForms(int $count = 1, ?string $lang = null): array
 	{
 		$lang = $lang ?: $this->getCurrentLang();
-		$pluralForms = isset($this->availableLanguages[$lang]) ? $this->availableLanguages[$lang] : self::$defaultPluralForms;
+		$pluralForms = $this->availableLanguages[$lang] ?? null;
+		if ($pluralForms === null) {
+			// no explicit rule: built-in rule of the language (no eval()), otherwise the default meta
+			$builtIn = PluralRules::get($lang);
+			if ($builtIn !== null) {
+				[$nplurals, $rule] = $builtIn;
+				return array($nplurals, $rule(abs($count)));
+			}
+			$pluralForms = self::$defaultPluralForms;
+		}
 		if (!$pluralForms) {
 			throw new TranslatorException("Empty plural-form meta for language $lang.");
 		}
