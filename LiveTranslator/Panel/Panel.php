@@ -1,39 +1,36 @@
 <?php
+declare(strict_types=1);
 
 // todo proč se window.open kterej má ukázat erroru nezobrazí?
 // todo zakázat uložení / nebo nějak to vymyslet když edituje a smaže celej text
 // todo když hledá string nejde pak na překlad kliknout na poprvý
 
-namespace LiveTranslator;
+namespace LiveTranslator\Panel;
 
+use LiveTranslator\Translator;
 use Nette;
 use Latte;
 
-class Panel extends Nette\Object implements \Tracy\IBarPanel
+class Panel implements \Tracy\IBarPanel
 {
+	use Nette\SmartObject;
 
 	const XHR_HEADER = 'X-Translation-Client';
 
 	const LANGUAGE_KEY = 'X-LiveTranslator-Lang',
 		NAMESPACE_KEY = 'X-LiveTranslator-Ns';
 
-	/** @var string */
-	protected $layout = 'vertical';
+	protected string $layout = 'vertical';
 
-	/** @var int */
-	protected $height = 465;
+	protected int $height = 465;
 
-	/** @var Translator */
-	protected $translator;
+	protected Translator $translator;
 
-	/** @var Nette\Http\IRequest */
-	protected $httpRequest;
+	protected Nette\Http\IRequest $httpRequest;
 
 
 
 	/**
-	 * @param Translator $translator
-	 * @param Nette\Http\IRequest $httpRequest
 	 * @throws Nette\InvalidArgumentException
 	 */
 	public function __construct(Translator $translator, Nette\Http\IRequest $httpRequest)
@@ -46,28 +43,28 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 
 
 
-	public function getLayout()
+	public function getLayout(): string
 	{
 		return $this->layout;
 	}
 
 
 
-	public function getHeight()
+	public function getHeight(): int
 	{
 		return $this->height;
 	}
 
 
 
-	public function getTranslator()
+	public function getTranslator(): Translator
 	{
 		return $this->translator;
 	}
 
 
 
-	public function setLayout($layout)
+	public function setLayout(string $layout): self
 	{
 		if (!in_array($layout, array('horizontal', 'vertical'))){
 			throw new Nette\InvalidArgumentException("Unknown layout $layout.");
@@ -78,12 +75,12 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 
 
 
-	public function setHeight($height)
+	public function setHeight(int|string $height): self
 	{
 		if (!is_numeric($height)){
 			throw new Nette\InvalidArgumentException("Height must be integer.");
 		}
-		$this->height = $height;
+		$this->height = (int) $height;
 		return $this;
 	}
 
@@ -91,21 +88,23 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 
 	/**
 	 * Returns the code for the panel tab.
-	 * @return string
 	 */
-	public function getTab()
+	public function getTab(): string
 	{
-		$template = new Nette\Templating\FileTemplate(__DIR__ . '/tab.phtml');
-		return $template->__toString();
+		//$template = new Nette\Templating\FileTemplate(__DIR__ . '/tab.phtml');
+		//return $template->__toString();
+
+		$latte = $this->createTemplate();
+		return $latte->renderToString(__DIR__ . '/tab.phtml'
+		);
 	}
 
 
 
 	/**
 	 * Returns the code for the panel.
-	 * @return string
 	 */
-	public function getPanel()
+	public function getPanel(): string
 	{
 		$latte = $this->createTemplate();
 		$file = $this->translator->isCurrentLangDefault() ? '/panel.inactive.phtml' : '/panel.phtml';
@@ -117,14 +116,14 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 			$parameters['availableLangs'] = $this->translator->getAvailableLanguages();
 		}
 		else {
-			$parameters['availableLangs'] = NULL;
+			$parameters['availableLangs'] = null;
 		}
 		return $latte->renderToString(__DIR__ . $file, $parameters);
 	}
 
 
 
-	public function getLink($toLang)
+	public function getLink(string $toLang): ?string
 	{
 		return $this->translator->getPresenterLink($toLang);
 	}
@@ -134,7 +133,7 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 	/**
 	 * Handles incoming request and sets translations.
 	 */
-	private function processRequest()
+	private function processRequest(): void
 	{
 		if ($this->httpRequest->isMethod('post') && $this->httpRequest->isAjax() && $this->httpRequest->getHeader(self::XHR_HEADER)) {
 			$data = json_decode(file_get_contents('php://input'));
@@ -154,11 +153,11 @@ class Panel extends Nette\Object implements \Tracy\IBarPanel
 	}
 
 
-	private function createTemplate()
+	private function createTemplate(): Latte\Engine
 	{
 		$latte = new Latte\Engine;
-		$latte->addFilter('ordinal', function($n){
-			switch (substr($n, -1)) {
+		$latte->addFilter('ordinal', function (int|string $n): string {
+			switch (substr((string) $n, -1)) { // plural variant number - int under strict_types
 				case 1:
 					return 'st';
 				case 2:

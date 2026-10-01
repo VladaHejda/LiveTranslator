@@ -1,7 +1,7 @@
 services:
 	translatorStorage: DummyStorage
 	translatorPanel:
-		class: LiveTranslator\Panel
+		class: LiveTranslator\Panel\Panel
 		setup:
 			- setLayout(horizontal)
 			- setHeight(500)

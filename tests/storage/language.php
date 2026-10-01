@@ -11,20 +11,20 @@ class LanguageStorage implements \LiveTranslator\ITranslatorStorage
 		),
 	);
 
-	function getTranslation($original, $lang, $v = 0, $n = NULL)
+	function getTranslation(string $original, string $lang, int $v = 0, ?string $n = null): ?string
 	{
 		if (!isset($this->translations[$lang][$original])) return NULL;
 		return $this->translations[$lang][$original];
 	}
 
-	function getAllTranslations($lang, $n = NULL)
+	function getAllTranslations(string $lang, ?string $n = null): array
 	{
 		return $this->translations[$lang];
 	}
 
-	function setTranslation($o, $t, $l, $v = 0, $n = NULL)
+	function setTranslation(string $o, string $t, string $l, int $v = 0, ?string $n = null)
 	{}
 
-	function removeTranslation($o, $l, $n = NULL)
+	function removeTranslation(string $o, string $l, ?string $n = null)
 	{}
 }

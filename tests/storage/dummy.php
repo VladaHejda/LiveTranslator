@@ -2,15 +2,19 @@
 
 class DummyStorage implements \LiveTranslator\ITranslatorStorage
 {
-	function getTranslation($o, $l, $v = 0, $n = NULL)
+	function getTranslation(string $o, string $l, int $v = 0, ?string $n = null): ?string
+	{
+		return null;
+	}
+
+	function getAllTranslations(string $l, ?string $n = null): array
+	{
+		return [];
+	}
+
+	function setTranslation(string $o, string $t, string $l, int $v = 0, ?string $n = null)
 	{}
 
-	function getAllTranslations($l, $n = NULL)
-	{}
-
-	function setTranslation($o, $t, $l, $v = 0, $n = NULL)
-	{}
-
-	function removeTranslation($o, $l, $n = NULL)
+	function removeTranslation(string $o, string $l, ?string $n = null)
 	{}
 }

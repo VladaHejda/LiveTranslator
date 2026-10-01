@@ -11,20 +11,20 @@ class NamespaceStorage implements \LiveTranslator\ITranslatorStorage
 		),
 	);
 
-	function getTranslation($original, $l, $v = 0, $ns = NULL)
+	function getTranslation(string $original, string $l, int $v = 0, ?string $ns = null): ?string
 	{
 		if (!isset($this->translations[$ns][$original])) return NULL;
 		return $this->translations[$ns][$original];
 	}
 
-	function getAllTranslations($l, $ns = NULL)
+	function getAllTranslations(string $l, ?string $ns = null): array
 	{
 		return $this->translations[$ns];
 	}
 
-	function setTranslation($o, $t, $l, $variant = 0, $n = NULL)
+	function setTranslation(string $o, string $t, string $l, int $variant = 0, ?string $n = null)
 	{}
 
-	function removeTranslation($o, $l, $n = NULL)
+	function removeTranslation(string $o, string $l, ?string $n = null)
 	{}
 }

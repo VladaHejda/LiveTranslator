@@ -6,7 +6,7 @@ $container = require __DIR__ . '/bootstrap.application.php';
 require __DIR__.'/storage/language.php';
 
 use \LiveTranslator\Translator as Tr;
-$trans = new Tr('en', new LanguageStorage, $container->getService('session'), $container->getService('application'));
+$trans = new Tr('en', new LanguageStorage, $container->getService('application'));
 
 $trans->setCurrentLang('cz');
 
@@ -21,8 +21,19 @@ $trans->setCurrentLang('de');
 
 Assert::equal('Hallo Welt.', $trans->translate('Hello world.'));
 
-// checks if new string "Goodbye home." persists in session after switching language
+// strings without translation are kept per language - "Goodbye home." was requested in cz only
+$all = $trans->getAllStrings();
+Assert::equal(1, count($all));
+Assert::false(array_key_exists('Goodbye home.', $all));
+Assert::equal('Hallo Welt.', $all['Hello world.']);
+
+$trans->translate('Goodbye home.');
 $all = $trans->getAllStrings();
 Assert::equal(2, count($all));
-Assert::true(array_key_exists('Goodbye home.', $all));
-Assert::equal('Hallo Welt.', $all['Hello world.']);
+Assert::false($all['Goodbye home.']);
+
+// the cz list survives switching the language
+$trans->setCurrentLang('cz');
+$all = $trans->getAllStrings();
+Assert::equal(2, count($all));
+Assert::false($all['Goodbye home.']);

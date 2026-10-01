@@ -1,10 +1,13 @@
-<style type="text/css">
+﻿<style type="text/css">
 #TranslationPanel {
-	min-width: 600px;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 2px;
 }
 
-#TranslationPanel h1 {
-	float: none;
+.tracy-inner:has(#TranslationPanel),
+.tracy-inner-container:has(#TranslationPanel) {
+	height: 100%;
 }
 
 #TranslationPanel-availableLangs {
@@ -15,27 +18,29 @@
     margin: 7px 30px 0 0;
 }
 
-#TranslationPanel .nette-inner {
-	max-width: 800px !important;
-	height: {$panel->height|noescape}px;
-	padding: 1px;
+.tracy-inner #TranslationPanel {
+	height: 100%;
 }
 
 #TranslationPanel-sidebar {
-	width: {$panel->layout == 'vertical' ? '40%' : '30%'|noescape};
+	width: {$panel->getLayout() == 'vertical' ? '40%' : '30%'|noescape} !important;
 	height: 100%;
 	overflow: hidden;
 	float: left;
-	margin: -1px 0 -1px -1px;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
 }
 
 #TranslationPanel-strings {
-	height: {$panel->height - 38|noescape}px;
+	flex: 1 1 auto;
+	min-height: 0;
 	overflow: auto;
 	border: 1px solid #AAA;
 }
 
 #TranslationPanel-filter {
+	flex: 0 0 auto;
 	padding: 3px 3px 3px 21px;
 	border: 1px solid #AAA;
 	margin-bottom: 2px;
@@ -56,7 +61,7 @@
 
 #TranslationPanel div.TranslationPanel-string {
 	border-bottom: 1px solid #DDD;
-	padding: 0.3ex 1ex;
+	padding: 0.3ex 2ex 0.3ex 1ex;
 	background-color: #E6EFC2;
 }
 
@@ -83,29 +88,29 @@
 	cursor: default;
 }
 
-#TranslationPanel div.TranslationPanel-string.modified, #TranslationPanel div.TranslationPanel-string.erased-string {
-	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAT9JREFUeNpi/P//PwMlgImBQkCxAQwgLyBjdPBqvsV/fHrwGvBmqc2U/x9m/QfRZBnw5Xg+UOjjfxCNywAWdOe9Xmi16P/f37EMDH8ZuDS9GP692w2mX807DDSEmYGRmXUxUFkcTD2GAd/+MkpL+9YxMHPxMfx5d5Th/9ebDIzc6gyiUTMY/nx4zvBsW5c0snpGdGczMjKqXJxoNFHZRMmLTVKL4d+3ewxMXEoMPx+dY7h7+tE2g9JLIH/dwWcAiFL4eqrwPrMAK8Pfj/cYmAXVGX6/ecfAazFdESj3AFkP1nTwZoVXORMXG8PXCycYbh24u+7rucMMLHzCDK8WWJYTlQ7erPT6/3yuxccoO3FPIFc+yk7M8/kC+49vlrv+R9eDywvGQPwHiK8D8S8gZgNiTWign0XWwzj0MxNAgAEA2MzWr2VXRDEAAAAASUVORK5CYII=");
-	background-position: 99% 50%;
-	background-repeat: no-repeat;
-}
-
 #TranslationPanel div.TranslationPanel-string span.do-erase {
 	color: #a40000;
 	cursor: pointer;
 	float: right;
 }
 
+#TranslationPanel div.TranslationPanel-string span.do-erase.erased {
+	width: 16px;
+	height: 16px;
+	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAT9JREFUeNpi/P//PwMlgImBQkCxAQwgLyBjdPBqvsV/fHrwGvBmqc2U/x9m/QfRZBnw5Xg+UOjjfxCNywAWdOe9Xmi16P/f37EMDH8ZuDS9GP692w2mX807DDSEmYGRmXUxUFkcTD2GAd/+MkpL+9YxMHPxMfx5d5Th/9ebDIzc6gyiUTMY/nx4zvBsW5c0snpGdGczMjKqXJxoNFHZRMmLTVKL4d+3ewxMXEoMPx+dY7h7+tE2g9JLIH/dwWcAiFL4eqrwPrMAK8Pfj/cYmAXVGX6/ecfAazFdESj3AFkP1nTwZoVXORMXG8PXCycYbh24u+7rucMMLHzCDK8WWJYTlQ7erPT6/3yuxccoO3FPIFc+yk7M8/kC+49vlrv+R9eDywvGQPwHiK8D8S8gZgNiTWign0XWwzj0MxNAgAEA2MzWr2VXRDEAAAAASUVORK5CYII=");
+	background-repeat: no-repeat;
+}
+
 #TranslationPanel-editor {
-	width: {$panel->layout == 'vertical' ? '58%' : '68%'|noescape};
-	height: 100%;
-	margin: -1px -1px -1px 0;
+	width: {$panel->getLayout() == 'vertical' ? '58%' : '68%'|noescape} !important;
+	height: 100% !important;
 	float: right;
 	position: relative;
 }
 
 #TranslationPanel div.TranslationPanel-stringVariant {
 	height: 127px;
-{if $panel->layout == 'horizontal'}
+{if $panel->getLayout() == 'horizontal'}
 	width: 50%;
 	float: left;
 {/if}
@@ -121,7 +126,7 @@
 }
 
 div.TranslationPanel-stringVariant textarea {
-	width: 95%;
+	width: 100%;
 	height: 70%;
 	background-color: #fff;
 	border: 1px solid #bbb !important;
@@ -134,9 +139,9 @@ div.TranslationPanel-stringVariant textarea.disabled {
 
 #TranslationPanel-tools {
 	position: absolute;
-	bottom: -1px;
+	bottom: 0px;
 	right: 0px;
-	width: 98%;
+	width: 100% !important;
 	background-color: #EDEAE0;
 	padding: 1ex;
 	text-align: right;
@@ -171,9 +176,9 @@ div.TranslationPanel-stringVariant textarea.disabled {
 	text-align: left;
 }
 
-#TranslationPanel-status textarea {
+#TranslationPanel-originalText textarea {
 	background-color: #fff;
-	width: {$panel->layout == 'vertical' ? '340px' : '532px'|noescape};
+	width: {$panel->getLayout() == 'vertical' ? '100% !important' : '532px'|noescape};
 	height: 40px;
 }
 
@@ -265,6 +270,8 @@ function clone(obj){
 var translationPanel = {
 	strings: {json_encode($translator->getAllStrings())|noescape},
 	variants: {$translator->getVariantsCount()},
+	// texts used as plural - only they get all plural forms of the language, the others one field
+	plurals: {json_encode($translator->getPluralStrings(), \JSON_FORCE_OBJECT)|noescape},
 
 	updatedStrings: [],
 	erasedStrings: [],
@@ -326,6 +333,10 @@ var translationPanel = {
 		translationPanel.setStatus();
 	},
 
+	variantsOf: function (string) {
+		return this.plurals[string] ? this.variants : 1;
+	},
+
 	drawList: function () {
 		var list = document.getElementById('TranslationPanel-strings');
 		list.innerHTML = '';
@@ -336,9 +347,11 @@ var translationPanel = {
 
 		for (var i in this.strings) {
 			var translated = Boolean(this.strings[i]);
-			if (translated && (typeof(this.strings[i]) == 'object' && this.strings[i] instanceof Array) && this.strings[i].length > 1) {
+			if (translated && this.plurals[i]) {
+				// a plural text is translated only when all plural forms are filled
+				var forms = (typeof(this.strings[i]) == 'object' && this.strings[i] instanceof Array) ? this.strings[i] : [this.strings[i]];
 				for (var plural = 0; plural < this.variants; plural++) {
-					if (!this.strings[i][plural]) {
+					if (!forms[plural]) {
 						translated = false;
 						break;
 					}
@@ -400,7 +413,7 @@ var translationPanel = {
 				if (translated == 0) {
 					div.className += ' untranslated';
 				}
-				else {
+				//else {
 					var span = document.createElement('span');
 					span.className = 'do-erase';
 					span.title = 'erase translation';
@@ -409,7 +422,7 @@ var translationPanel = {
 						translationPanel.erase(this);
 					};
 					div.appendChild(span);
-				}
+				//}
 
 				this.listElements[i] = div;
 			}
@@ -438,8 +451,8 @@ var translationPanel = {
 	edit: function (anchor) {
 		var string = anchor.title;
 
-		this.fillIn(this.strings[string]);
 		this.currentString = string;
+		this.fillIn(this.strings[string]);
 		document.getElementById('TranslationPanel-stringVariant_0').focus();
 
 		var textarea = document.createElement('textarea');
@@ -448,7 +461,7 @@ var translationPanel = {
 			this.select();
 		};
 		textarea.textContent = this.escape(string);
-		this.setStatus(textarea);
+		this.setOriginalText(textarea);
 	},
 
 	erase: function (span) {
@@ -457,30 +470,66 @@ var translationPanel = {
 
 		this.erasedStrings.push(a.title);
 		div.className += ' erased-string';
-		div.removeChild(span);
 		a.onclick = null;
 		if (this.currentString == a.title){
 			this.disable();
 		}
 
+		span.className += ' erased';
+		span.title = 'cancel erasing';
+		span.innerHTML = '';
+		span.onclick = function () {
+			translationPanel.unerase(this);
+		};
+
 		document.getElementById('TranslationPanel-save').disabled = false;
 		document.getElementById('TranslationPanel-save').className = 'save';
+	},
+
+	unerase: function (span) {
+		var div = span.parentNode;
+		var a = div.firstChild;
+
+		var index = this.erasedStrings.indexOf(a.title);
+		if (index > -1) {
+			this.erasedStrings.splice(index, 1);
+		}
+
+		div.className = div.className.replace(/\s*\berased-string\b/, '');
+		a.onclick = function () {
+			translationPanel.edit(this);
+		};
+
+		span.className = 'do-erase';
+		span.title = 'erase translation';
+		span.innerHTML = '&times;';
+		span.onclick = function () {
+			translationPanel.erase(this);
+		};
 	},
 
 	fillIn: function (stringData) {
 		if (typeof(stringData) != 'object' || !(stringData instanceof Array))
 			stringData = [stringData];
 
+		var variants = this.variantsOf(this.currentString);
 		for (var i = 0; i < this.variants; i++) {
 			var textarea = document.getElementById('TranslationPanel-stringVariant_' + i);
 			textarea.disabled = false;
 			textarea.className = '';
+			textarea.parentNode.style.display = i < variants ? '' : 'none';
 
-			if (stringData[i])
+			if (i < variants && stringData[i])
 				textarea.value = stringData[i];
 			else
 				textarea.value = '';
 		}
+		this.setSingularLabel(variants > 1);
+	},
+
+	// the first field is "Singular" for a plural text, just "Translation" for the others
+	setSingularLabel: function (plural) {
+		document.getElementById('TranslationPanel-stringVariantLabel_0').textContent = plural ? 'Singular:' : 'Translation:';
 	},
 
 	disable: function () {
@@ -490,13 +539,16 @@ var translationPanel = {
 			textarea.value = '';
 			textarea.disabled = true;
 			textarea.className = 'disabled';
+			textarea.parentNode.style.display = i === 0 ? '' : 'none';
 		}
+		this.setSingularLabel(false);
+		this.setOriginalText(null);
 	},
 
 	save: function () {
 		if (this.currentString) {
 			var stringData = [];
-			for (var i = 0; i < this.variants; i++) {
+			for (var i = 0; i < this.variantsOf(this.currentString); i++) {
 				var textarea = document.getElementById('TranslationPanel-stringVariant_' + i);
 				if (textarea.value)
 					stringData[i] = textarea.value;
@@ -539,7 +591,7 @@ var translationPanel = {
 			if (xmlHttp.readyState == 4) {
 				if (xmlHttp.status == 200) {
 					for (var i in translationPanel.erasedStrings) {
-						translationPanel.strings[translationPanel.erasedStrings[i]] = false;
+						delete translationPanel.strings[translationPanel.erasedStrings[i]];
 					}
 					translationPanel.updatedStrings = [];
 					translationPanel.erasedStrings = [];
@@ -557,7 +609,7 @@ var translationPanel = {
 				}
 			}
 		};
-		xmlHttp.open("POST", window.location, true);
+		xmlHttp.open("POST", window.location.href, true);
 		xmlHttp.setRequestHeader({$panel::XHR_HEADER}, 'devel');
 		xmlHttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xmlHttp.send(JSON.stringify(data));
@@ -565,16 +617,17 @@ var translationPanel = {
 
 	setStatus: function (text) {
 		var status = document.getElementById('TranslationPanel-status');
-		if (typeof text == 'object'){
-			while (status.hasChildNodes()) {
-				status.removeChild(status.lastChild);
-			}
-			status.appendChild(text);
+		status.innerHTML = text ? text : '';
+	},
+
+	setOriginalText: function (node) {
+		var originalText = document.getElementById('TranslationPanel-originalText');
+		while (originalText.hasChildNodes()) {
+			originalText.removeChild(originalText.lastChild);
 		}
-		else if (text)
-			status.innerHTML = text;
-		else
-			status.innerHTML = '';
+		if (node) {
+			originalText.appendChild(node);
+		}
 	},
 
 	escape: function (string) {
@@ -586,36 +639,40 @@ var translationPanel = {
 	},
 };
 
+translationPanel.init();
+
 /* ]]> */
 </script>
 
-<div id="TranslationPanel">
-	<h1>
-        Translations ({$lang|upper})
-        <span id="TranslationPanel-availableLangs" n:if="$availableLangs" n:inner-foreach="$availableLangs as $i => $availableLang">
-            <a href="{$panel->getLink($availableLang)}">{$availableLang|upper}</a>{sep} | {/sep}
-        </span>
-    </h1>
+<h1>
+	Translations ({$lang|upper})
+	<span id="TranslationPanel-availableLangs" n:if="$availableLangs" n:inner-foreach="$availableLangs as $i => $availableLang">
+		<a href="{$panel->getLink($availableLang)}">{$availableLang|upper}</a>{sep} | {/sep}
+	</span>
+</h1>
 
-	<div class="nette-inner">
-		<div id="TranslationPanel-sidebar">
-			<div id="TranslationPanel-filter">
-				<input type="text" class="text" id="TranslationPanel-filterBox" />
-				<div id="TranslationPanel-filterReset"></div>
+<div class="tracy-inner">
+	<div class="tracy-inner-container">
+		<div id="TranslationPanel">
+			<div id="TranslationPanel-sidebar">
+				<div id="TranslationPanel-filter">
+					<input type="text" class="text" id="TranslationPanel-filterBox" />
+					<div id="TranslationPanel-filterReset"></div>
+				</div>
+				<div id="TranslationPanel-strings"></div>
 			</div>
-			<div id="TranslationPanel-strings">
-			</div>
-		</div>
 
-		<div id="TranslationPanel-editor">
-			{var $variants = range(0, $translator->getVariantsCount() -1)}
-			<div class="TranslationPanel-stringVariant" n:foreach="$variants as $i => $variant">
-				<label for="TranslationPanel-stringVariant_{$i}">{if $i > 0}{$i}<sup>{$i|ordinal}</sup> plural{else}Singular{/if}:</label>
-				<textarea id="TranslationPanel-stringVariant_{$i}" rows="4" cols="40"></textarea>
-			</div>
-			<div id="TranslationPanel-tools">
-				<span id="TranslationPanel-status">Initializing&hellip;</span>
-				<input type="button" value="Save" class="save" id="TranslationPanel-save" />
+			<div id="TranslationPanel-editor">
+				<div id="TranslationPanel-originalText"></div>
+				{var $variants = range(0, $translator->getVariantsCount() -1)}
+				<div class="TranslationPanel-stringVariant" n:foreach="$variants as $i => $variant">
+					<label for="TranslationPanel-stringVariant_{$i}"{if $i === 0} id="TranslationPanel-stringVariantLabel_0"{/if}>{if $i > 0}{$i}<sup>{$i|ordinal}</sup> plural{else}Translation{/if}:</label>
+					<textarea id="TranslationPanel-stringVariant_{$i}" rows="4" cols="40"></textarea>
+				</div>
+				<div id="TranslationPanel-tools">
+					<div id="TranslationPanel-status">Initializing&hellip;</div>
+					<input type="button" value="Save" class="save" id="TranslationPanel-save" />
+				</div>
 			</div>
 		</div>
 	</div>

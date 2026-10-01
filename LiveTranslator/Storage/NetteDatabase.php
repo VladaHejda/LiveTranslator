@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace LiveTranslator\Storage;
 
@@ -6,26 +7,21 @@ namespace LiveTranslator\Storage;
 class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 {
 
-	/** @var \Nette\Database\Connection */
-	private $db;
+	private \Nette\Database\Explorer $db;
 
-	/** @var string */
-	private $defaultTable;
+	private string $defaultTable;
 
-	/** @var string */
-	private $translationTable;
+	private string $translationTable;
 
 
 
 	/**
 	 * @param string $defaultTableName name of table with original texts
 	 * @param string $translationTableName name of table with translated texts
-	 * @param \Nette\Database\Connection $db
-	 * @param \Nette\Database\Context|NULL $context
 	 */
-	public function __construct($defaultTableName, $translationTableName, \Nette\Database\Connection $db, \Nette\Database\Context $context = NULL)
+	public function __construct(string $defaultTableName, string $translationTableName, \Nette\Database\Explorer $db)
 	{
-		$this->db = $context ?: $db; // Context is part of newer Nette version
+		$this->db = $db;
 		if ($defaultTableName[0] !== '`') {
 			$defaultTableName = "`{$defaultTableName}`";
 		}
@@ -38,7 +34,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 
 
-	public function getTranslation($original, $lang, $variant = 0, $namespace = NULL)
+	public function getTranslation(string $original, string $lang, int $variant = 0, ?string $namespace = null): ?string
 	{
 		$arg = array();
 
@@ -51,19 +47,19 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 			$arg[] = $namespace;
 		}
 
-		$arg[0] .= 'BINARY d.`text` = ? AND t.`lang` = ? AND t.`variant` <= ? ORDER BY t.`variant` DESC';
+		$arg[0] .= 'd.`text` = ? AND t.`lang` = ? AND t.`variant` <= ? ORDER BY t.`variant` DESC';
 		$arg[] = $original;
 		$arg[] = $lang;
 		$arg[] = $variant;
 
 		$translation = $this->fetchField($arg);
 
-		return $translation ?: NULL;
+		return $translation ?: null;
 	}
 
 
 
-	public function getAllTranslations($lang, $namespace = NULL)
+	public function getAllTranslations(string $lang, ?string $namespace = null): array
 	{
 		$arg = array();
 
@@ -79,7 +75,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 		$arg[0] .= "t.`lang` = ?";
 		$arg[] = $lang;
 
-		$translations = call_user_func_array(array($this->db, 'fetchAll'), $arg);
+		$translations = $this->db->fetchAll(...$arg);
 
 		$output = array();
 		foreach ($translations as $translation){
@@ -93,7 +89,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 
 
-	public function setTranslation($original, $translated, $lang, $variant = 0, $namespace = NULL)
+	public function setTranslation(string $original, string $translated, string $lang, int $variant = 0, ?string $namespace = null): void
 	{
 		$arg = array();
 
@@ -104,7 +100,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 			$arg[] = $namespace;
 		}
 
-		$arg[0] .= "BINARY `text` = ?";
+		$arg[0] .= "`text` = ?";
 		$arg[] = $original;
 
 		$textId = $this->fetchField($arg);
@@ -124,7 +120,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 				$data = array('text' => $original);
 				if ($namespace) $data['ns'] = $namespace;
 				$this->db->query("INSERT INTO {$this->defaultTable} ?", $data);
-				$textId = $this->db->fetch("SELECT LAST_INSERT_ID() id")->id;
+				$textId = $this->db->getInsertId();
 			}
 
 			$this->db->query("INSERT INTO {$this->translationTable} ?", array(
@@ -138,7 +134,7 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 
 
-	public function removeTranslation($original, $lang, $namespace = NULL)
+	public function removeTranslation(string $original, string $lang, ?string $namespace = null): void
 	{
 		$arg = array();
 
@@ -165,10 +161,9 @@ class NetteDatabase implements \LiveTranslator\ITranslatorStorage
 
 
 
-	private function fetchField(array $args)
+	private function fetchField(array $args): mixed
 	{
-		$databaseMethodName = $this->db instanceof \Nette\Database\Context ? 'fetchField' : 'fetchColumn';
-		return call_user_func_array(array($this->db, $databaseMethodName), $args);
+		return $this->db->fetchField(...$args);
 	}
 
 }

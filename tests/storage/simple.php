@@ -11,7 +11,7 @@ class SimpleStorage implements \LiveTranslator\ITranslatorStorage
 		'%2$d man screams %1$s.' => array('%1$s křičí %2$d muž.', '%2$d muži křičí "%1$s!".', '%1$s křičí %2$d mužů.'),
 	);
 
-	function getTranslation($original, $l, $variant = 0, $n = NULL)
+	function getTranslation(string $original, string $l, int $variant = 0, ?string $n = null): ?string
 	{
 		if (!isset($this->translations[$original])) return NULL;
 		return isset($this->translations[$original][$variant])
@@ -20,18 +20,18 @@ class SimpleStorage implements \LiveTranslator\ITranslatorStorage
 		;
 	}
 
-	function getAllTranslations($l, $n = NULL)
+	function getAllTranslations(string $l, ?string $n = null): array
 	{
 		return $this->translations;
 	}
 
-	function setTranslation($original, $translated, $l, $variant = 0, $n = NULL)
+	function setTranslation(string $original, string $translated, string $l, int $variant = 0, ?string $n = null)
 	{
 		if (!isset($this->translations[$original])) $this->translations[$original] = array();
 		$this->translations[$original][$variant] = $translated;
 	}
 
-	function removeTranslation($original, $l, $n = NULL)
+	function removeTranslation(string $original, string $l, ?string $n = null)
 	{
 		unset($this->translations[$original]);
 	}
